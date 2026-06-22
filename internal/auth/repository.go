@@ -43,17 +43,18 @@ type sessionRow struct {
 
 // --- Users ---
 
-// userByEmail returns the user for a (normalized) email, or nil if none exists.
-func (r *Repository) userByEmail(ctx context.Context, email string) (*userRow, error) {
+// userByCanonicalEmail returns the user matching the canonical email (used for
+// de-duplication), or nil if none exists.
+func (r *Repository) userByCanonicalEmail(ctx context.Context, canonical string) (*userRow, error) {
 	var u userRow
 	err := r.pool.QueryRow(ctx,
-		`SELECT id, email, is_created_profile, onboarding_step FROM users WHERE email = $1`, email,
+		`SELECT id, email, is_created_profile, onboarding_step FROM users WHERE canonical_email = $1`, canonical,
 	).Scan(&u.ID, &u.Email, &u.IsCreatedProfile, &u.OnboardingStep)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}
 	if err != nil {
-		return nil, fmt.Errorf("auth: user by email: %w", err)
+		return nil, fmt.Errorf("auth: user by canonical email: %w", err)
 	}
 	return &u, nil
 }
@@ -73,11 +74,12 @@ func (r *Repository) userByID(ctx context.Context, id uuid.UUID) (*userRow, erro
 	return &u, nil
 }
 
-// createUser inserts a new user with the given (normalized) email.
-func (r *Repository) createUser(ctx context.Context, email string) (*userRow, error) {
+// createUser inserts a new user with the entered email and its canonical key.
+func (r *Repository) createUser(ctx context.Context, email, canonical string) (*userRow, error) {
 	var u userRow
 	err := r.pool.QueryRow(ctx,
-		`INSERT INTO users (email) VALUES ($1) RETURNING id, email, is_created_profile, onboarding_step`, email,
+		`INSERT INTO users (email, canonical_email) VALUES ($1, $2)
+		 RETURNING id, email, is_created_profile, onboarding_step`, email, canonical,
 	).Scan(&u.ID, &u.Email, &u.IsCreatedProfile, &u.OnboardingStep)
 	if err != nil {
 		return nil, fmt.Errorf("auth: create user: %w", err)

@@ -134,12 +134,15 @@ func (s *Service) CheckCode(ctx context.Context, email, code string) (tokenRespo
 		return tokenResponse{}, err
 	}
 
-	user, err := s.repo.userByEmail(ctx, email)
+	// Identity is de-duplicated on the canonical email (blocks Gmail dot/plus
+	// multi-accounting); OTP was sent to the entered address.
+	canonical := canonicalEmail(email)
+	user, err := s.repo.userByCanonicalEmail(ctx, canonical)
 	if err != nil {
 		return tokenResponse{}, err
 	}
 	if user == nil {
-		if user, err = s.repo.createUser(ctx, email); err != nil {
+		if user, err = s.repo.createUser(ctx, email, canonical); err != nil {
 			return tokenResponse{}, err
 		}
 	}
