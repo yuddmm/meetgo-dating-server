@@ -1,0 +1,30 @@
+# Binaries
+/bin/
+/server
+*.exe
+*.out
+
+# air hot-reload build dir
+/tmp/
+
+# GeoIP database (downloaded separately, not committed)
+*.mmdb
+
+# Local photo uploads (dev filesystem storage)
+/uploads/
+
+# Env files (keep .env.example tracked)
+.env
+.env.local
+
+# Go
+/vendor/
+
+# IDE / editor
+.idea/
+.vscode/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db

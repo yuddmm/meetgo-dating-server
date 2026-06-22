@@ -1,0 +1,3 @@
+-- 000001_init (up)
+-- Placeholder initial migration. Domain schema will be added here once the
+-- client data model is available in docs/.

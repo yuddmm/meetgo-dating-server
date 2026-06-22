@@ -1,0 +1,36 @@
+services:
+  postgres:
+    image: postgres:18-alpine
+    container_name: meetgo-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-meetgo}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-meetgo}
+      POSTGRES_DB: ${POSTGRES_DB:-meetgo}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-meetgo} -d ${POSTGRES_DB:-meetgo}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  app:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    container_name: meetgo-app
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      ENV: ${ENV:-dev}
+      HTTP_PORT: "8080"
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      DATABASE_URL: "postgres://${POSTGRES_USER:-meetgo}:${POSTGRES_PASSWORD:-meetgo}@postgres:5432/${POSTGRES_DB:-meetgo}?sslmode=disable"
+    ports:
+      - "${HTTP_PORT:-8080}:8080"
+
+volumes:
+  pgdata:

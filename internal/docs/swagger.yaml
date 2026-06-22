@@ -1,0 +1,514 @@
+basePath: /api/v1
+definitions:
+  auth.checkCodeRequest:
+    properties:
+      code:
+        type: string
+      email:
+        type: string
+    type: object
+  auth.meResponse:
+    properties:
+      email:
+        type: string
+      id:
+        type: string
+      isCreatedProfile:
+        type: boolean
+      onboardingStep:
+        type: string
+    type: object
+  auth.refreshRequest:
+    properties:
+      refreshToken:
+        type: string
+    type: object
+  auth.sendCodeRequest:
+    properties:
+      email:
+        type: string
+    type: object
+  auth.sendCodeResponse:
+    properties:
+      expiresIn:
+        description: seconds
+        type: integer
+      resendAfter:
+        description: seconds
+        type: integer
+    type: object
+  auth.tokenResponse:
+    properties:
+      accessToken:
+        type: string
+      isCreatedProfile:
+        type: boolean
+      onboardingStep:
+        type: string
+      refreshToken:
+        type: string
+    type: object
+  interest.Interest:
+    properties:
+      id:
+        type: string
+      value:
+        type: string
+    type: object
+  profile.aboutRequest:
+    properties:
+      datingGoal:
+        type: string
+      description:
+        type: string
+      height:
+        description: cm, optional
+        type: number
+      interestIds:
+        items:
+          type: string
+        type: array
+      showZodiac:
+        type: boolean
+      weight:
+        description: kg, optional
+        type: number
+    type: object
+  profile.basicsRequest:
+    properties:
+      birthDate:
+        description: YYYY-MM-DD
+        type: string
+      city:
+        type: string
+      gender:
+        type: string
+      name:
+        type: string
+    type: object
+  profile.completeResponse:
+    properties:
+      isCreatedProfile:
+        type: boolean
+      onboardingStep:
+        type: string
+    type: object
+  profile.crop:
+    properties:
+      size:
+        type: number
+      x:
+        type: number
+      "y":
+        type: number
+    type: object
+  profile.photoResponse:
+    properties:
+      crop:
+        $ref: '#/definitions/profile.crop'
+      id:
+        type: string
+      position:
+        type: integer
+      url:
+        type: string
+    type: object
+  profile.profileEnvelope:
+    properties:
+      onboardingStep:
+        type: string
+      profile:
+        $ref: '#/definitions/profile.profileResponse'
+    type: object
+  profile.profileResponse:
+    properties:
+      birthDate:
+        type: string
+      city:
+        type: string
+      datingGoal:
+        type: string
+      description:
+        type: string
+      gender:
+        type: string
+      height:
+        type: number
+      id:
+        type: string
+      interests:
+        items:
+          $ref: '#/definitions/interest.Interest'
+        type: array
+      name:
+        type: string
+      photos:
+        items:
+          $ref: '#/definitions/profile.photoResponse'
+        type: array
+      showZodiac:
+        type: boolean
+      userId:
+        type: string
+      weight:
+        type: number
+    type: object
+  profile.reorderRequest:
+    properties:
+      order:
+        items:
+          type: string
+        type: array
+    type: object
+  profile.setCropRequest:
+    properties:
+      crop:
+        $ref: '#/definitions/profile.crop'
+    type: object
+info:
+  contact: {}
+  description: Backend API for the MeetGo dating app.
+  title: MeetGo API
+  version: 0.1.0
+paths:
+  /auth/check_code:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: email + code
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/auth.checkCodeRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/auth.tokenResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            type: object
+        "422":
+          description: Unprocessable Entity
+          schema:
+            type: object
+      summary: Verify OTP code and issue tokens
+      tags:
+      - auth
+  /auth/logout:
+    post:
+      responses:
+        "204":
+          description: No Content
+        "401":
+          description: Unauthorized
+          schema:
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Revoke the current session
+      tags:
+      - auth
+  /auth/refresh:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: refreshToken
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/auth.refreshRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/auth.tokenResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            type: object
+      summary: Rotate token pair
+      tags:
+      - auth
+  /auth/send_code:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: email
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/auth.sendCodeRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/auth.sendCodeResponse'
+        "422":
+          description: Unprocessable Entity
+          schema:
+            type: object
+        "429":
+          description: Too Many Requests
+          schema:
+            type: object
+      summary: Send OTP code to email
+      tags:
+      - auth
+  /interests:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/interest.Interest'
+            type: array
+      security:
+      - BearerAuth: []
+      summary: List interests reference
+      tags:
+      - interests
+  /me:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/auth.meResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Current account identity
+      tags:
+      - auth
+  /me/profile:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/profile.profileResponse'
+        "404":
+          description: Not Found
+          schema:
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get my profile
+      tags:
+      - profile
+  /me/profile/about:
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: about
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/profile.aboutRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/profile.profileEnvelope'
+        "409":
+          description: Conflict
+          schema:
+            type: object
+        "422":
+          description: Unprocessable Entity
+          schema:
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Onboarding step 2 — about
+      tags:
+      - profile
+  /me/profile/basics:
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: basics
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/profile.basicsRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/profile.profileEnvelope'
+        "422":
+          description: Unprocessable Entity
+          schema:
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Onboarding step 1 — basics
+      tags:
+      - profile
+  /me/profile/complete:
+    post:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/profile.completeResponse'
+        "422":
+          description: Unprocessable Entity
+          schema:
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Finalize onboarding (>=2 photos)
+      tags:
+      - profile
+  /me/profile/photos:
+    post:
+      consumes:
+      - multipart/form-data
+      parameters:
+      - description: image (jpeg/png/webp, <=10MB)
+        in: formData
+        name: photo
+        required: true
+        type: file
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/profile.photoResponse'
+        "409":
+          description: Conflict
+          schema:
+            type: object
+        "422":
+          description: Unprocessable Entity
+          schema:
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Upload a profile photo (multipart field "photo")
+      tags:
+      - profile
+  /me/profile/photos/{id}:
+    delete:
+      parameters:
+      - description: photo id
+        in: path
+        name: id
+        required: true
+        type: string
+      responses:
+        "204":
+          description: No Content
+        "404":
+          description: Not Found
+          schema:
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Delete a photo
+      tags:
+      - profile
+    patch:
+      consumes:
+      - application/json
+      parameters:
+      - description: photo id
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: crop
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/profile.setCropRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/profile.photoResponse'
+        "404":
+          description: Not Found
+          schema:
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Set/update a photo crop
+      tags:
+      - profile
+  /me/profile/photos/order:
+    patch:
+      consumes:
+      - application/json
+      parameters:
+      - description: order
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/profile.reorderRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/profile.photoResponse'
+            type: array
+        "422":
+          description: Unprocessable Entity
+          schema:
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Reorder photos (first = main)
+      tags:
+      - profile
+securityDefinitions:
+  BearerAuth:
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"

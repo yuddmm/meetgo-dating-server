@@ -1,0 +1,21 @@
+# air hot-reload config (https://github.com/air-verse/air)
+# Run with: air   (or: make dev)
+root = "."
+tmp_dir = "tmp"
+
+[build]
+  cmd = "go build -o ./tmp/server.exe ./cmd/server"
+  entrypoint = "./tmp/server.exe"
+  delay = 1000
+  include_ext = ["go", "sql", "tpl", "tmpl", "html", "env"]
+  exclude_dir = ["tmp", "internal/docs", "deployments", "docs"]
+  exclude_regex = ["_test.go"]
+  stop_on_error = true
+  send_interrupt = true
+  kill_delay = "2s"
+
+[misc]
+  clean_on_exit = true
+
+[log]
+  time = true
