@@ -63,6 +63,19 @@ func (r *Repository) profileByUserID(ctx context.Context, userID uuid.UUID) (*pr
 	return p, nil
 }
 
+// profileByID returns the profile by its id, or nil if none exists.
+func (r *Repository) profileByID(ctx context.Context, profileID uuid.UUID) (*profileRow, error) {
+	p, err := scanProfile(r.pool.QueryRow(ctx,
+		`SELECT `+profileCols+` FROM profiles WHERE id = $1`, profileID))
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("profile: by id: %w", err)
+	}
+	return p, nil
+}
+
 // interestsByProfileID returns the profile's interests as reference items.
 func (r *Repository) interestsByProfileID(ctx context.Context, profileID uuid.UUID) ([]interest.Interest, error) {
 	rows, err := r.pool.Query(ctx, `

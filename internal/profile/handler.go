@@ -33,6 +33,37 @@ func (h *Handler) Routes(r chi.Router) {
 	r.Delete("/me/profile/photos/{id}", h.DeletePhoto)
 
 	r.Post("/me/profile/complete", h.Complete)
+
+	// Public profile view by id (info is not private).
+	r.Get("/profiles/{id}", h.GetByID)
+}
+
+// GetByID godoc
+//
+//	@Summary	Get a public profile by id
+//	@Tags		profile
+//	@Security	BearerAuth
+//	@Produce	json
+//	@Param		id	path		string	true	"profile id"
+//	@Success	200	{object}	profileResponse
+//	@Failure	404	{object}	object
+//	@Router		/profiles/{id} [get]
+func (h *Handler) GetByID(w http.ResponseWriter, r *http.Request) {
+	if _, ok := auth.UserID(r.Context()); !ok {
+		httpx.WriteError(w, errUnauthorized)
+		return
+	}
+	id, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		httpx.WriteError(w, errProfileNotFound)
+		return
+	}
+	resp, err := h.svc.PublicByID(r.Context(), id)
+	if err != nil {
+		httpx.WriteError(w, err)
+		return
+	}
+	httpx.JSON(w, http.StatusOK, resp)
 }
 
 // userID extracts the authenticated user id (middleware guarantees presence).

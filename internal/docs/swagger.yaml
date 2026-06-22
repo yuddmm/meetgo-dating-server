@@ -48,12 +48,115 @@ definitions:
       refreshToken:
         type: string
     type: object
+  geo.updateRequest:
+    properties:
+      lat:
+        type: number
+      lng:
+        type: number
+    type: object
   interest.Interest:
     properties:
       id:
         type: string
       value:
         type: string
+    type: object
+  meeting.Tag:
+    properties:
+      id:
+        type: string
+      value:
+        type: string
+    type: object
+  meeting.acceptResponse:
+    properties:
+      chatId:
+        type: string
+    type: object
+  meeting.adRequest:
+    properties:
+      description:
+        type: string
+      tagIds:
+        items:
+          type: string
+        type: array
+    type: object
+  meeting.adResponse:
+    properties:
+      authorProfileId:
+        type: string
+      createdAt:
+        type: string
+      description:
+        type: string
+      expiresAt:
+        type: string
+      id:
+        type: string
+      status:
+        type: string
+      tags:
+        items:
+          $ref: '#/definitions/meeting.Tag'
+        type: array
+    type: object
+  meeting.feedAuthor:
+    properties:
+      age:
+        type: integer
+      avatarUrl:
+        type: string
+      gender:
+        type: string
+      id:
+        type: string
+      name:
+        type: string
+    type: object
+  meeting.feedItem:
+    properties:
+      author:
+        $ref: '#/definitions/meeting.feedAuthor'
+      description:
+        type: string
+      distanceKm:
+        type: integer
+      id:
+        description: ad id
+        type: string
+      tags:
+        items:
+          $ref: '#/definitions/meeting.Tag'
+        type: array
+    type: object
+  meeting.feedResponse:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/meeting.feedItem'
+        type: array
+      nextCursor:
+        type: string
+    type: object
+  meeting.likeProfile:
+    properties:
+      avatarUrl:
+        type: string
+      id:
+        type: string
+      name:
+        type: string
+    type: object
+  meeting.likeResponse:
+    properties:
+      createdAt:
+        type: string
+      id:
+        type: string
+      profile:
+        $ref: '#/definitions/meeting.likeProfile'
     type: object
   profile.aboutRequest:
     properties:
@@ -284,6 +387,74 @@ paths:
       summary: List interests reference
       tags:
       - interests
+  /likes:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/meeting.likeResponse'
+            type: array
+      security:
+      - BearerAuth: []
+      summary: Incoming likes on my active ad
+      tags:
+      - meetings
+  /likes/{id}/accept:
+    post:
+      parameters:
+      - description: like id
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/meeting.acceptResponse'
+        "404":
+          description: Not Found
+          schema:
+            type: object
+        "409":
+          description: Conflict
+          schema:
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Accept a like (opens a chat)
+      tags:
+      - meetings
+  /likes/{id}/reject:
+    post:
+      parameters:
+      - description: like id
+        in: path
+        name: id
+        required: true
+        type: string
+      responses:
+        "204":
+          description: No Content
+        "404":
+          description: Not Found
+          schema:
+            type: object
+        "409":
+          description: Conflict
+          schema:
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Reject a like
+      tags:
+      - meetings
   /me:
     get:
       produces:
@@ -504,6 +675,275 @@ paths:
       security:
       - BearerAuth: []
       summary: Reorder photos (first = main)
+      tags:
+      - profile
+  /meeting-ad:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: ad
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/meeting.adRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/meeting.adResponse'
+        "403":
+          description: Forbidden
+          schema:
+            type: object
+        "409":
+          description: Conflict
+          schema:
+            type: object
+        "422":
+          description: Unprocessable Entity
+          schema:
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Create my meeting ad
+      tags:
+      - meetings
+  /meeting-ad/{id}:
+    get:
+      parameters:
+      - description: ad id
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/meeting.adResponse'
+        "404":
+          description: Not Found
+          schema:
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get an ad by id
+      tags:
+      - meetings
+  /meeting-ad/{id}/like:
+    post:
+      parameters:
+      - description: ad id
+        in: path
+        name: id
+        required: true
+        type: string
+      responses:
+        "201":
+          description: Created
+        "404":
+          description: Not Found
+          schema:
+            type: object
+        "409":
+          description: Conflict
+          schema:
+            type: object
+        "422":
+          description: Unprocessable Entity
+          schema:
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Like an ad
+      tags:
+      - meetings
+  /meeting-ad/me:
+    delete:
+      responses:
+        "204":
+          description: No Content
+        "404":
+          description: Not Found
+          schema:
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Remove my active ad
+      tags:
+      - meetings
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/meeting.adResponse'
+        "404":
+          description: Not Found
+          schema:
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get my active ad
+      tags:
+      - meetings
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: ad
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/meeting.adRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/meeting.adResponse'
+        "404":
+          description: Not Found
+          schema:
+            type: object
+        "422":
+          description: Unprocessable Entity
+          schema:
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Edit my active ad (description + tags)
+      tags:
+      - meetings
+  /meeting-list:
+    get:
+      parameters:
+      - description: distance | date
+        in: query
+        name: sort
+        type: string
+      - description: km
+        in: query
+        name: radius
+        type: number
+      - description: MALE | FEMALE
+        in: query
+        name: gender
+        type: string
+      - description: 18..99
+        in: query
+        name: ageMin
+        type: integer
+      - description: 18..99
+        in: query
+        name: ageMax
+        type: integer
+      - description: dating goal
+        in: query
+        name: goal
+        type: string
+      - collectionFormat: csv
+        description: meeting tag ids
+        in: query
+        items:
+          type: string
+        name: tagIds
+        type: array
+      - description: opaque cursor
+        in: query
+        name: cursor
+        type: string
+      - description: page size
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/meeting.feedResponse'
+        "422":
+          description: Unprocessable Entity
+          schema:
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Discovery feed of nearby ads (keyset cursor)
+      tags:
+      - meetings
+  /meeting-tags:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/meeting.Tag'
+            type: array
+      security:
+      - BearerAuth: []
+      summary: List meeting tags reference
+      tags:
+      - meetings
+  /my-geo:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: lat/lng
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/geo.updateRequest'
+      responses:
+        "204":
+          description: No Content
+        "422":
+          description: Unprocessable Entity
+          schema:
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Update my current location (write-only; never returned)
+      tags:
+      - geo
+  /profiles/{id}:
+    get:
+      parameters:
+      - description: profile id
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/profile.profileResponse'
+        "404":
+          description: Not Found
+          schema:
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get a public profile by id
       tags:
       - profile
 securityDefinitions:

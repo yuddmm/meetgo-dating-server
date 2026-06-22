@@ -11,8 +11,10 @@ import (
 	httpSwagger "github.com/swaggo/http-swagger/v2"
 
 	"github.com/yuddmm/meetgo-dating-server/internal/auth"
+	"github.com/yuddmm/meetgo-dating-server/internal/geo"
 	"github.com/yuddmm/meetgo-dating-server/internal/handler"
 	"github.com/yuddmm/meetgo-dating-server/internal/interest"
+	"github.com/yuddmm/meetgo-dating-server/internal/meeting"
 	"github.com/yuddmm/meetgo-dating-server/internal/platform/storage"
 	"github.com/yuddmm/meetgo-dating-server/internal/profile"
 )
@@ -24,6 +26,8 @@ type Deps struct {
 	Auth     *auth.Handler
 	Interest *interest.Handler
 	Profile  *profile.Handler
+	Geo      *geo.Handler
+	Meeting  *meeting.Handler
 	Storage  storage.Storage
 }
 
@@ -59,6 +63,8 @@ func NewRouter(deps Deps) http.Handler {
 			r.Use(deps.Auth.Middleware)
 			deps.Interest.Routes(r)
 			deps.Profile.Routes(r)
+			deps.Geo.Routes(r)
+			deps.Meeting.Routes(r)
 		})
 		// TODO: mount further domain routes (meetings, ...) here.
 	})

@@ -86,6 +86,22 @@ func (s *Service) SaveAbout(ctx context.Context, userID uuid.UUID, req aboutRequ
 	return s.buildEnvelope(ctx, userID)
 }
 
+// PublicByID returns a profile by its id (public view), or PROFILE_NOT_FOUND.
+func (s *Service) PublicByID(ctx context.Context, profileID uuid.UUID) (profileResponse, error) {
+	row, err := s.repo.profileByID(ctx, profileID)
+	if err != nil {
+		return profileResponse{}, err
+	}
+	if row == nil {
+		return profileResponse{}, errProfileNotFound
+	}
+	resp, err := s.buildFromRow(ctx, row)
+	if err != nil {
+		return profileResponse{}, err
+	}
+	return *resp, nil
+}
+
 // buildProfile assembles the profile response (or nil when there is no profile).
 func (s *Service) buildProfile(ctx context.Context, userID uuid.UUID) (*profileResponse, error) {
 	row, err := s.repo.profileByUserID(ctx, userID)
@@ -95,6 +111,11 @@ func (s *Service) buildProfile(ctx context.Context, userID uuid.UUID) (*profileR
 	if row == nil {
 		return nil, nil
 	}
+	return s.buildFromRow(ctx, row)
+}
+
+// buildFromRow assembles the full profile response (interests + photos) from a row.
+func (s *Service) buildFromRow(ctx context.Context, row *profileRow) (*profileResponse, error) {
 	interests, err := s.repo.interestsByProfileID(ctx, row.ID)
 	if err != nil {
 		return nil, err

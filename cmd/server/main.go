@@ -10,7 +10,9 @@ import (
 	"github.com/yuddmm/meetgo-dating-server/internal/auth"
 	"github.com/yuddmm/meetgo-dating-server/internal/config"
 	"github.com/yuddmm/meetgo-dating-server/internal/database"
+	"github.com/yuddmm/meetgo-dating-server/internal/geo"
 	"github.com/yuddmm/meetgo-dating-server/internal/interest"
+	"github.com/yuddmm/meetgo-dating-server/internal/meeting"
 	"github.com/yuddmm/meetgo-dating-server/internal/platform/geoip"
 	"github.com/yuddmm/meetgo-dating-server/internal/platform/storage"
 	"github.com/yuddmm/meetgo-dating-server/internal/profile"
@@ -55,12 +57,12 @@ func run() error {
 
 	// GeoIP (optional): enables the RU-region Russian-email rule when a database
 	// is configured; otherwise resolution is disabled and the rule never fires.
-	geo, err := geoip.New(cfg.GeoIPDBPath)
+	ipGeo, err := geoip.New(cfg.GeoIPDBPath)
 	if err != nil {
 		return err
 	}
-	defer geo.Close()
-	logger.Info("geoip", slog.Bool("enabled", geo.Enabled()))
+	defer ipGeo.Close()
+	logger.Info("geoip", slog.Bool("enabled", ipGeo.Enabled()))
 
 	// Auth module wiring. The dev mailer logs OTP codes; a real provider is
 	// added later.
@@ -76,7 +78,7 @@ func run() error {
 			DevMode:        cfg.IsDev(),
 		}),
 		tokens,
-		geo,
+		ipGeo,
 		cfg.IsDev(),
 	)
 
@@ -89,6 +91,8 @@ func run() error {
 
 	interestHandler := interest.NewHandler(interest.NewRepository(pool))
 	profileHandler := profile.NewHandler(profile.NewService(profile.NewRepository(pool), store))
+	geoHandler := geo.NewHandler(geo.NewRepository(pool))
+	meetingHandler := meeting.NewHandler(meeting.NewService(meeting.NewRepository(pool)))
 
 	router := server.NewRouter(server.Deps{
 		Logger:   logger,
@@ -96,6 +100,8 @@ func run() error {
 		Auth:     authHandler,
 		Interest: interestHandler,
 		Profile:  profileHandler,
+		Geo:      geoHandler,
+		Meeting:  meetingHandler,
 		Storage:  store,
 	})
 	srv := server.New(cfg, logger, router)
