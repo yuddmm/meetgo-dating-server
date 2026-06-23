@@ -13,7 +13,6 @@ import (
 // Validation bounds (docs/auth-flow.md, units.md, meetgo-profile-photo-decisions).
 const (
 	nameMaxLen   = 100
-	cityMaxLen   = 120
 	descMinLen   = 30
 	descMaxLen   = 1000
 	minInterests = 1
@@ -41,7 +40,12 @@ type basicsRequest struct {
 	Name      string `json:"name"`
 	Gender    string `json:"gender"`
 	BirthDate string `json:"birthDate"` // YYYY-MM-DD
-	City      string `json:"city"`
+}
+
+// cityRef is the derived effective city of the profile (from geo), or null.
+type cityRef struct {
+	ID   uuid.UUID `json:"id"`
+	Name string    `json:"name"`
 }
 
 type aboutRequest struct {
@@ -61,7 +65,7 @@ type profileResponse struct {
 	Name        string              `json:"name"`
 	Gender      string              `json:"gender"`
 	BirthDate   string              `json:"birthDate"`
-	City        string              `json:"city"`
+	City        *cityRef            `json:"city"`
 	Interests   []interest.Interest `json:"interests"`
 	Description string              `json:"description"`
 	DatingGoal  *string             `json:"datingGoal"`
@@ -76,14 +80,14 @@ type profileEnvelope struct {
 	OnboardingStep string          `json:"onboardingStep"`
 }
 
-func toProfileResponse(p *profileRow, interests []interest.Interest, photos []photoResponse) profileResponse {
+func toProfileResponse(p *profileRow, interests []interest.Interest, photos []photoResponse, city *cityRef) profileResponse {
 	return profileResponse{
 		ID:          p.ID,
 		UserID:      p.UserID,
 		Name:        p.Name,
 		Gender:      p.Gender,
 		BirthDate:   p.BirthDate.Format(dateLayout),
-		City:        p.City,
+		City:        city,
 		Interests:   interests,
 		Description: p.Description,
 		DatingGoal:  p.DatingGoal,
@@ -105,10 +109,6 @@ func validateBasics(req basicsRequest) (time.Time, *httpx.APIError) {
 	}
 	if !validGenders[req.Gender] {
 		details["gender"] = "must be MALE or FEMALE"
-	}
-	city := strings.TrimSpace(req.City)
-	if city == "" || len(city) > cityMaxLen {
-		details["city"] = "required, up to 120 chars"
 	}
 
 	birth, err := time.Parse(dateLayout, req.BirthDate)

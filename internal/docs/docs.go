@@ -168,6 +168,42 @@ const docTemplate = `{
                 }
             }
         },
+        "/cities": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "geo"
+                ],
+                "summary": "Search cities (picker)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "query",
+                        "name": "q",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/geo.cityDTO"
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/interests": {
             "get": {
                 "security": [
@@ -329,6 +365,56 @@ const docTemplate = `{
                     },
                     "401": {
                         "description": "Unauthorized",
+                        "schema": {
+                            "type": "object"
+                        }
+                    }
+                }
+            }
+        },
+        "/me/location": {
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "geo"
+                ],
+                "summary": "Set location mode (AUTO/MANUAL city override)",
+                "parameters": [
+                    {
+                        "description": "mode + cityId",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/geo.setLocationRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/geo.locationResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "type": "object"
+                        }
+                    },
+                    "422": {
+                        "description": "Unprocessable Entity",
                         "schema": {
                             "type": "object"
                         }
@@ -1037,15 +1123,15 @@ const docTemplate = `{
                 "tags": [
                     "geo"
                 ],
-                "summary": "Update my current location (write-only; never returned)",
+                "summary": "Update my location (write-only; never returned)",
                 "parameters": [
                     {
-                        "description": "lat/lng",
+                        "description": "lat/lng/accuracy",
                         "name": "body",
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/geo.updateRequest"
+                            "$ref": "#/definitions/geo.updateGeoRequest"
                         }
                     }
                 ],
@@ -1177,9 +1263,52 @@ const docTemplate = `{
                 }
             }
         },
-        "geo.updateRequest": {
+        "geo.cityDTO": {
             "type": "object",
             "properties": {
+                "id": {
+                    "type": "string"
+                },
+                "name": {
+                    "description": "COALESCE(name_ru, name)",
+                    "type": "string"
+                },
+                "region": {
+                    "type": "string"
+                }
+            }
+        },
+        "geo.locationResponse": {
+            "type": "object",
+            "properties": {
+                "city": {
+                    "$ref": "#/definitions/geo.cityDTO"
+                },
+                "mode": {
+                    "type": "string"
+                }
+            }
+        },
+        "geo.setLocationRequest": {
+            "type": "object",
+            "properties": {
+                "cityId": {
+                    "description": "required for MANUAL",
+                    "type": "string"
+                },
+                "mode": {
+                    "description": "AUTO | MANUAL",
+                    "type": "string"
+                }
+            }
+        },
+        "geo.updateGeoRequest": {
+            "type": "object",
+            "properties": {
+                "accuracy": {
+                    "description": "meters, optional",
+                    "type": "number"
+                },
                 "lat": {
                     "type": "number"
                 },
@@ -1261,6 +1390,17 @@ const docTemplate = `{
                 }
             }
         },
+        "meeting.cityRef": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                }
+            }
+        },
         "meeting.feedAuthor": {
             "type": "object",
             "properties": {
@@ -1287,10 +1427,14 @@ const docTemplate = `{
                 "author": {
                     "$ref": "#/definitions/meeting.feedAuthor"
                 },
+                "city": {
+                    "$ref": "#/definitions/meeting.cityRef"
+                },
                 "description": {
                     "type": "string"
                 },
                 "distanceKm": {
+                    "description": "null in city mode without viewer location",
                     "type": "integer"
                 },
                 "id": {
@@ -1382,10 +1526,18 @@ const docTemplate = `{
                     "description": "YYYY-MM-DD",
                     "type": "string"
                 },
-                "city": {
+                "gender": {
                     "type": "string"
                 },
-                "gender": {
+                "name": {
+                    "type": "string"
+                }
+            }
+        },
+        "profile.cityRef": {
+            "type": "object",
+            "properties": {
+                "id": {
                     "type": "string"
                 },
                 "name": {
@@ -1453,7 +1605,7 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "city": {
-                    "type": "string"
+                    "$ref": "#/definitions/profile.cityRef"
                 },
                 "datingGoal": {
                     "type": "string"

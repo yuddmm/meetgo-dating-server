@@ -91,7 +91,7 @@ func run() error {
 
 	interestHandler := interest.NewHandler(interest.NewRepository(pool))
 	profileHandler := profile.NewHandler(profile.NewService(profile.NewRepository(pool), store))
-	geoHandler := geo.NewHandler(geo.NewRepository(pool))
+	geoHandler := geo.NewHandler(geo.NewService(geo.NewRepository(pool)))
 	meetingHandler := meeting.NewHandler(meeting.NewService(meeting.NewRepository(pool)))
 
 	router := server.NewRouter(server.Deps{

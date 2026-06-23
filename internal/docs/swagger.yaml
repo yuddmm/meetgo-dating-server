@@ -48,8 +48,37 @@ definitions:
       refreshToken:
         type: string
     type: object
-  geo.updateRequest:
+  geo.cityDTO:
     properties:
+      id:
+        type: string
+      name:
+        description: COALESCE(name_ru, name)
+        type: string
+      region:
+        type: string
+    type: object
+  geo.locationResponse:
+    properties:
+      city:
+        $ref: '#/definitions/geo.cityDTO'
+      mode:
+        type: string
+    type: object
+  geo.setLocationRequest:
+    properties:
+      cityId:
+        description: required for MANUAL
+        type: string
+      mode:
+        description: AUTO | MANUAL
+        type: string
+    type: object
+  geo.updateGeoRequest:
+    properties:
+      accuracy:
+        description: meters, optional
+        type: number
       lat:
         type: number
       lng:
@@ -102,6 +131,13 @@ definitions:
           $ref: '#/definitions/meeting.Tag'
         type: array
     type: object
+  meeting.cityRef:
+    properties:
+      id:
+        type: string
+      name:
+        type: string
+    type: object
   meeting.feedAuthor:
     properties:
       age:
@@ -119,9 +155,12 @@ definitions:
     properties:
       author:
         $ref: '#/definitions/meeting.feedAuthor'
+      city:
+        $ref: '#/definitions/meeting.cityRef'
       description:
         type: string
       distanceKm:
+        description: null in city mode without viewer location
         type: integer
       id:
         description: ad id
@@ -182,9 +221,14 @@ definitions:
       birthDate:
         description: YYYY-MM-DD
         type: string
-      city:
-        type: string
       gender:
+        type: string
+      name:
+        type: string
+    type: object
+  profile.cityRef:
+    properties:
+      id:
         type: string
       name:
         type: string
@@ -228,7 +272,7 @@ definitions:
       birthDate:
         type: string
       city:
-        type: string
+        $ref: '#/definitions/profile.cityRef'
       datingGoal:
         type: string
       description:
@@ -371,6 +415,28 @@ paths:
       summary: Send OTP code to email
       tags:
       - auth
+  /cities:
+    get:
+      parameters:
+      - description: query
+        in: query
+        name: q
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/geo.cityDTO'
+            type: array
+      security:
+      - BearerAuth: []
+      summary: Search cities (picker)
+      tags:
+      - geo
   /interests:
     get:
       produces:
@@ -473,6 +539,37 @@ paths:
       summary: Current account identity
       tags:
       - auth
+  /me/location:
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: mode + cityId
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/geo.setLocationRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/geo.locationResponse'
+        "404":
+          description: Not Found
+          schema:
+            type: object
+        "422":
+          description: Unprocessable Entity
+          schema:
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Set location mode (AUTO/MANUAL city override)
+      tags:
+      - geo
   /me/profile:
     get:
       produces:
@@ -904,12 +1001,12 @@ paths:
       consumes:
       - application/json
       parameters:
-      - description: lat/lng
+      - description: lat/lng/accuracy
         in: body
         name: body
         required: true
         schema:
-          $ref: '#/definitions/geo.updateRequest'
+          $ref: '#/definitions/geo.updateGeoRequest'
       responses:
         "204":
           description: No Content
@@ -919,7 +1016,7 @@ paths:
             type: object
       security:
       - BearerAuth: []
-      summary: Update my current location (write-only; never returned)
+      summary: Update my location (write-only; never returned)
       tags:
       - geo
   /profiles/{id}:

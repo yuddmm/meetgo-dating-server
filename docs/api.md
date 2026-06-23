@@ -106,13 +106,12 @@ Authorization: Bearer <accessToken>
 → {
     "name": "...",
     "gender": "MALE",                    // MALE | FEMALE
-    "birthDate": "1998-05-20",
-    "city": "..."
+    "birthDate": "1998-05-20"
   }
 ← 200 { "profile": <Profile>, "onboardingStep": "ABOUT" }
 ```
 
-Валидация: `name` обязателен; `gender` обязателен, ∈ enum (`MALE` | `FEMALE`); `birthDate` обязателен и **18+**; `city` обязателен.
+Валидация: `name` обязателен; `gender` обязателен, ∈ enum (`MALE` | `FEMALE`); `birthDate` обязателен и **18+**. **`city` руками не вводят** — определяется по геолокации и переопределяется отдельно (см. [geolocation.md](./geolocation.md)).
 
 #### `PUT /me/profile/about` — шаг 2
 
@@ -160,6 +159,10 @@ DELETE /me/profile/photos/{id}   — 204
 - **`PATCH order` принимает ПОЛНЫЙ список** id текущих фото ровно один раз (не частичный) — иначе `422`. Reorder сбрасывает `crop` у всех неглавных; у главного (`position 0`) `crop` сохраняется.
 - Загрузка/правка фото доступны только начиная с шага `PHOTOS` (после `about`), иначе `409 STEP_ORDER`. Несуществующее фото → `404 PHOTO_NOT_FOUND`.
 
+> **TODO (после MVP, бета): модерация фото** — наличие человека/лица + NSFW (блюр
+> «остренького», reject явного, строже для аватара). Спецификация:
+> [photo-moderation.md](./photo-moderation.md).
+
 #### `POST /me/profile/complete`
 
 Финальный гейт: проверяет, что все шаги заполнены валидно + **≥2 фото**, и атомарно ставит `isCreatedProfile = true`.
@@ -184,7 +187,7 @@ DELETE /me/profile/photos/{id}   — 204
 ### Сущности (этого контракта)
 
 - **User** (auth): `id`, `email`, `isCreatedProfile`, `createdAt`.
-- **Profile** (1:1 с User): `id`, `userId`, `name`, `gender` (`MALE` | `FEMALE`), `birthDate`, `city`, `interests[]` (`{ id, value }`), `description`, `datingGoal`, `height?`, `weight?`, `showZodiac`, `photos[]` (`Photo[]`).
+- **Profile** (1:1 с User): `id`, `userId`, `name`, `gender` (`MALE` | `FEMALE`), `birthDate`, `city` (`{ id, name } | null` — производный/переопределённый, **не вводится в онбординге**; см. [geolocation.md](./geolocation.md)), `interests[]` (`{ id, value }`), `description`, `datingGoal`, `height?`, `weight?`, `showZodiac`, `photos[]` (`Photo[]`).
 - **Photo**: `id`, `url`, `position`, `crop?` (см. «Фото»).
 
 Пример `<Profile>`:
@@ -196,7 +199,7 @@ DELETE /me/profile/photos/{id}   — 204
   "name": "Аня",
   "gender": "FEMALE",
   "birthDate": "1998-05-20",
-  "city": "Москва",
+  "city": { "id": "<uuid>", "name": "Москва" },
   "interests": [{ "id": "<uuid>", "value": "COFFEE" }],
   "description": "...",
   "datingGoal": "DATES",

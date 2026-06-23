@@ -2,16 +2,13 @@ package meeting
 
 import (
 	"context"
-	"math"
 	"time"
 
 	"github.com/google/uuid"
 )
 
-const kmPerDegLat = 111.045
-
-// Feed returns a keyset page of nearby active ads. Empty when the viewer has no
-// stored location or no (completed) profile.
+// Feed returns a keyset page of nearby/city ads. Empty when the viewer has no
+// completed profile, or (radius mode) no location.
 func (s *Service) Feed(ctx context.Context, userID uuid.UUID, f feedFilters) (feedResponse, error) {
 	empty := feedResponse{Items: []feedItem{}}
 
@@ -23,38 +20,63 @@ func (s *Service) Feed(ctx context.Context, userID uuid.UUID, f feedFilters) (fe
 		return empty, nil
 	}
 
-	// Pin the viewer's origin for the whole scroll session: first page reads the
-	// live stored geo; later pages reuse the origin carried in the cursor, so
-	// distances/ordering stay stable even if the viewer moves mid-scroll.
-	var lat0, lng0 float64
-	if f.Cursor != nil {
-		lat0, lng0 = f.Cursor.Lat, f.Cursor.Lng
+	mode := "radius"
+	if f.CityID != nil {
+		mode = "city"
+	}
+
+	// Resolve sort + pinned viewer origin: from the cursor on later pages
+	// (self-describing), from the DB + request on the first page.
+	var (
+		cursor       *feedCursor
+		sort         = f.Sort
+		hasPt        bool
+		vlat, vlng   float64
+	)
+	if f.CursorRaw != "" {
+		c, cerr := decodeCursor(f.CursorRaw)
+		if cerr != nil {
+			return feedResponse{}, cerr
+		}
+		cursor = c
+		sort = c.Sort
+		hasPt, vlat, vlng = c.HasPoint, c.Lat, c.Lng
 	} else {
-		var hasGeo bool
-		lat0, lng0, hasGeo, err = s.repo.viewerGeo(ctx, userID)
+		vlat, vlng, hasPt, err = s.repo.viewerEffectivePoint(ctx, userID)
 		if err != nil {
 			return feedResponse{}, err
 		}
-		if !hasGeo {
-			return empty, nil
+		if !hasPt {
+			sort = sortDate // can't sort by distance without an origin
 		}
 	}
 
-	latMin, latMax, lngMin, lngMax := boundingBox(lat0, lng0, f.Radius)
-	rows, err := s.repo.feedPage(ctx, feedQuery{
-		Lat0: lat0, Lng0: lng0,
-		LatMin: latMin, LatMax: latMax, LngMin: lngMin, LngMax: lngMax,
+	// Radius mode is meaningless without the viewer's location.
+	if mode == "radius" && !hasPt {
+		return empty, nil
+	}
+
+	q := feedQuery{
 		ViewerProfileID: profileID,
+		HasViewerPoint:  hasPt,
+		ViewerLat:       vlat,
+		ViewerLng:       vlng,
+		Mode:            mode,
+		RadiusMeters:    f.Radius * 1000,
 		Gender:          f.Gender,
 		Goal:            f.Goal,
 		AgeMin:          f.AgeMin,
 		AgeMax:          f.AgeMax,
 		TagIDs:          f.TagIDs,
-		Radius:          f.Radius,
-		Sort:            f.Sort,
-		Cursor:          f.Cursor,
+		Sort:            sort,
+		Cursor:          cursor,
 		Limit:           f.Limit,
-	})
+	}
+	if f.CityID != nil {
+		q.CityID = *f.CityID
+	}
+
+	rows, err := s.repo.feedPage(ctx, q)
 	if err != nil {
 		return feedResponse{}, err
 	}
@@ -78,11 +100,21 @@ func (s *Service) Feed(ctx context.Context, userID uuid.UUID, f feedFilters) (fe
 		if tags == nil {
 			tags = []Tag{}
 		}
+		var dist *int
+		if r.DistKm != nil {
+			d := distanceKm(*r.DistKm)
+			dist = &d
+		}
+		var city *cityRef
+		if r.CityID != nil && r.CityName != nil {
+			city = &cityRef{ID: *r.CityID, Name: *r.CityName}
+		}
 		items[i] = feedItem{
 			ID:          r.AdID,
 			Description: r.Description,
 			Tags:        tags,
-			DistanceKm:  distanceKm(r.Dist),
+			City:        city,
+			DistanceKm:  dist,
 			Author: feedAuthor{
 				ID:        r.AuthorProfileID,
 				Name:      r.Name,
@@ -95,32 +127,19 @@ func (s *Service) Feed(ctx context.Context, userID uuid.UUID, f feedFilters) (fe
 
 	resp := feedResponse{Items: items}
 	if len(rows) == f.Limit {
-		resp.NextCursor = nextCursor(f.Sort, rows[len(rows)-1], lat0, lng0)
+		resp.NextCursor = nextCursor(sort, rows[len(rows)-1], hasPt, vlat, vlng)
 	}
 	return resp, nil
 }
 
-func nextCursor(sort string, last feedRow, lat0, lng0 float64) *string {
-	c := feedCursor{Sort: sort, ID: last.AdID.String(), Lat: lat0, Lng: lng0}
+func nextCursor(sort string, last feedRow, hasPt bool, vlat, vlng float64) *string {
+	c := feedCursor{Sort: sort, ID: last.AdID.String(), HasPoint: hasPt, Lat: vlat, Lng: vlng}
 	if sort == sortDate {
 		ts := last.CreatedAt.UTC().Format(time.RFC3339Nano)
 		c.Ts = &ts
-	} else {
-		d := last.Dist
-		c.Dist = &d
+	} else if last.DistKm != nil {
+		c.Dist = last.DistKm
 	}
 	s := encodeCursor(c)
 	return &s
-}
-
-// boundingBox returns a lat/lng box around (lat0,lng0) for the radius (km),
-// used as a cheap index prefilter before the exact haversine distance.
-func boundingBox(lat0, lng0, radiusKm float64) (latMin, latMax, lngMin, lngMax float64) {
-	dLat := radiusKm / kmPerDegLat
-	cosLat := math.Cos(lat0 * math.Pi / 180)
-	if cosLat < 0.01 {
-		cosLat = 0.01 // guard near the poles
-	}
-	dLng := radiusKm / (kmPerDegLat * cosLat)
-	return lat0 - dLat, lat0 + dLat, lng0 - dLng, lng0 + dLng
 }

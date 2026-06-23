@@ -29,7 +29,6 @@ type profileRow struct {
 	Name        string
 	Gender      string
 	BirthDate   time.Time
-	City        string
 	Description string
 	DatingGoal  *string
 	HeightCm    *float64
@@ -37,17 +36,33 @@ type profileRow struct {
 	ShowZodiac  bool
 }
 
-const profileCols = `id, user_id, name, gender, birth_date, city, description,
+const profileCols = `id, user_id, name, gender, birth_date, description,
 	dating_goal, height_cm, weight_kg, show_zodiac`
 
 func scanProfile(row pgx.Row) (*profileRow, error) {
 	var p profileRow
-	err := row.Scan(&p.ID, &p.UserID, &p.Name, &p.Gender, &p.BirthDate, &p.City,
+	err := row.Scan(&p.ID, &p.UserID, &p.Name, &p.Gender, &p.BirthDate,
 		&p.Description, &p.DatingGoal, &p.HeightCm, &p.WeightKg, &p.ShowZodiac)
 	if err != nil {
 		return nil, err
 	}
 	return &p, nil
+}
+
+// effectiveCity returns the user's current effective city (from geo), or nil.
+func (r *Repository) effectiveCity(ctx context.Context, userID uuid.UUID) (*cityRef, error) {
+	var c cityRef
+	err := r.pool.QueryRow(ctx, `
+		SELECT c.id, COALESCE(c.name_ru, c.name)
+		FROM user_geo ug JOIN cities c ON c.id = ug.resolved_city_id
+		WHERE ug.user_id = $1`, userID).Scan(&c.ID, &c.Name)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("profile: effective city: %w", err)
+	}
+	return &c, nil
 }
 
 // profileByUserID returns the profile for a user, or nil if none exists.
@@ -122,16 +137,16 @@ func (r *Repository) countInterests(ctx context.Context, ids []uuid.UUID) (int, 
 }
 
 // saveBasics upserts the basics step and advances the onboarding step to ABOUT.
-func (r *Repository) saveBasics(ctx context.Context, userID uuid.UUID, name, gender string, birth time.Time, city string) (*profileRow, error) {
+func (r *Repository) saveBasics(ctx context.Context, userID uuid.UUID, name, gender string, birth time.Time) (*profileRow, error) {
 	var p *profileRow
 	err := r.inTx(ctx, func(tx pgx.Tx) error {
 		row, err := scanProfile(tx.QueryRow(ctx, `
-			INSERT INTO profiles (user_id, name, gender, birth_date, city)
-			VALUES ($1, $2, $3, $4, $5)
+			INSERT INTO profiles (user_id, name, gender, birth_date)
+			VALUES ($1, $2, $3, $4)
 			ON CONFLICT (user_id) DO UPDATE
 			SET name = EXCLUDED.name, gender = EXCLUDED.gender,
-			    birth_date = EXCLUDED.birth_date, city = EXCLUDED.city, updated_at = now()
-			RETURNING `+profileCols, userID, name, gender, birth, city))
+			    birth_date = EXCLUDED.birth_date, updated_at = now()
+			RETURNING `+profileCols, userID, name, gender, birth))
 		if err != nil {
 			return err
 		}

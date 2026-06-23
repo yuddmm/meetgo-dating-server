@@ -43,7 +43,7 @@ func (s *Service) SaveBasics(ctx context.Context, userID uuid.UUID, req basicsRe
 	if verr != nil {
 		return profileEnvelope{}, verr
 	}
-	if _, err := s.repo.saveBasics(ctx, userID, strings.TrimSpace(req.Name), req.Gender, birth, strings.TrimSpace(req.City)); err != nil {
+	if _, err := s.repo.saveBasics(ctx, userID, strings.TrimSpace(req.Name), req.Gender, birth); err != nil {
 		return profileEnvelope{}, err
 	}
 	return s.buildEnvelope(ctx, userID)
@@ -128,7 +128,11 @@ func (s *Service) buildFromRow(ctx context.Context, row *profileRow) (*profileRe
 	for i, p := range photoRows {
 		photos[i] = toPhotoResponse(p)
 	}
-	resp := toProfileResponse(row, interests, photos)
+	city, err := s.repo.effectiveCity(ctx, row.UserID)
+	if err != nil {
+		return nil, err
+	}
+	resp := toProfileResponse(row, interests, photos, city)
 	return &resp, nil
 }
 

@@ -76,6 +76,17 @@ func parseFeedFilters(r *http.Request) (feedFilters, *httpx.APIError) {
 			f.Radius = n
 		}
 	}
+	// City mode (exclusive with radius): cityId set → search the whole city.
+	if v := q.Get("cityId"); v != "" {
+		id, err := uuid.Parse(v)
+		if err != nil {
+			details["cityId"] = "invalid id"
+		} else if q.Get("radius") != "" {
+			details["cityId"] = "cannot combine cityId and radius"
+		} else {
+			f.CityID = &id
+		}
+	}
 	if v := q.Get("gender"); v != "" {
 		if !feedGenders[v] {
 			details["gender"] = "must be MALE or FEMALE"
@@ -114,14 +125,7 @@ func parseFeedFilters(r *http.Request) (feedFilters, *httpx.APIError) {
 			f.Limit = min(n, feedMaxLimit)
 		}
 	}
-	if v := q.Get("cursor"); v != "" {
-		c, cerr := decodeCursor(v, f.Sort)
-		if cerr != nil {
-			details["cursor"] = "invalid cursor"
-		} else {
-			f.Cursor = c
-		}
-	}
+	f.CursorRaw = q.Get("cursor") // decoded in the service (self-describing)
 
 	if len(details) > 0 {
 		return feedFilters{}, httpx.ValidationError(details)

@@ -13,6 +13,7 @@
 | [api.md](./api.md)             | ✅      | Контракт фронт↔бэк: auth (OTP, токены), профиль, фото, обработка 401         |
 | [meeting-list.md](./meeting-list.md) | 🚧 контракт | Анкета встречи (`MeetingAd`): создание, жизненный цикл, теги         |
 | [geolocation.md](./geolocation.md)   | 🚧 контракт | Геолокация: `/my-geo`, приватность, формат дистанции/радиуса         |
+| [photo-moderation.md](./photo-moderation.md) | 🚧 пост-MVP | Модерация фото: человек/лицо + NSFW (блюр/reject), пороги     |
 | [meeting-tags.md](./meeting-tags.md) | ✅      | Справочник тегов встреч (сид) + i18n `ru`                                    |
 | [interests.md](./interests.md) | ✅      | Справочник интересов (сид) + i18n `ru`                                       |
 | [tasks.md](./tasks.md)         | 🚧      | Бэклог фронта: ближайшие экраны и задачи                                     |

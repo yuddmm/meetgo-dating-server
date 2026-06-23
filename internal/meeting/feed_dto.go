@@ -22,17 +22,25 @@ const (
 	sortDate     = "date"
 )
 
-// feedFilters holds the parsed, validated discovery query.
+// feedFilters holds the parsed, validated discovery query. Modes are exclusive:
+// CityID set → city mode; otherwise radius mode.
 type feedFilters struct {
 	Sort   string
 	Radius float64
+	CityID *uuid.UUID // city mode
 	Gender *string
 	AgeMin int
 	AgeMax int
-	Goal   *string
-	TagIDs []uuid.UUID
-	Limit  int
-	Cursor *feedCursor
+	Goal      *string
+	TagIDs    []uuid.UUID
+	Limit     int
+	CursorRaw string // decoded in the service (self-describes its sort)
+}
+
+// cityRef is a compact city reference (author's effective city).
+type cityRef struct {
+	ID   uuid.UUID `json:"id"`
+	Name string    `json:"name"`
 }
 
 // feedAuthor is the compact author card for a feed item.
@@ -48,7 +56,8 @@ type feedItem struct {
 	ID          uuid.UUID  `json:"id"` // ad id
 	Description string     `json:"description"`
 	Tags        []Tag      `json:"tags"`
-	DistanceKm  int        `json:"distanceKm"`
+	City        *cityRef   `json:"city"`
+	DistanceKm  *int       `json:"distanceKm"` // null in city mode without viewer location
 	Author      feedAuthor `json:"author"`
 }
 
@@ -61,12 +70,13 @@ type feedResponse struct {
 // It also pins the viewer's origin (their OWN coords) so distances stay computed
 // from a fixed point for the whole scroll session — no third-party coords here.
 type feedCursor struct {
-	Sort string   `json:"s"`
-	Dist *float64 `json:"d,omitempty"` // for sort=distance
-	Ts   *string  `json:"t,omitempty"` // RFC3339Nano, for sort=date
-	ID   string   `json:"i"`           // last ad id
-	Lat  float64  `json:"la"`          // pinned viewer origin
-	Lng  float64  `json:"lo"`          // pinned viewer origin
+	Sort     string   `json:"s"`           // distance | date (self-describing)
+	Dist     *float64 `json:"d,omitempty"` // for sort=distance
+	Ts       *string  `json:"t,omitempty"` // RFC3339Nano, for sort=date
+	ID       string   `json:"i"`           // last ad id
+	Lat      float64  `json:"la"`          // pinned viewer origin
+	Lng      float64  `json:"lo"`          // pinned viewer origin
+	HasPoint bool     `json:"hp"`          // whether the viewer had a location
 }
 
 func encodeCursor(c feedCursor) string {
@@ -74,13 +84,16 @@ func encodeCursor(c feedCursor) string {
 	return base64.RawURLEncoding.EncodeToString(b)
 }
 
-func decodeCursor(raw, sort string) (*feedCursor, *httpx.APIError) {
+func decodeCursor(raw string) (*feedCursor, *httpx.APIError) {
 	b, err := base64.RawURLEncoding.DecodeString(raw)
 	if err != nil {
 		return nil, badCursor()
 	}
 	var c feedCursor
-	if err := json.Unmarshal(b, &c); err != nil || c.Sort != sort {
+	if err := json.Unmarshal(b, &c); err != nil {
+		return nil, badCursor()
+	}
+	if c.Sort != sortDistance && c.Sort != sortDate {
 		return nil, badCursor()
 	}
 	if _, err := uuid.Parse(c.ID); err != nil {
