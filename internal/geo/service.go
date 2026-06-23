@@ -111,13 +111,10 @@ func (s *Service) SetLocation(ctx context.Context, userID uuid.UUID, req setLoca
 	return locationResponse{Mode: mode, City: city}, nil
 }
 
-// SearchCities returns cities matching q for the picker.
+// SearchCities returns cities matching q for the picker. Empty q → top cities by
+// population (default list before the user types).
 func (s *Service) SearchCities(ctx context.Context, q string) ([]cityDTO, *httpx.APIError) {
-	q = strings.TrimSpace(q)
-	if q == "" {
-		return []cityDTO{}, nil
-	}
-	items, err := s.repo.searchCities(ctx, q, citiesLimit)
+	items, err := s.repo.searchCities(ctx, strings.TrimSpace(q), citiesLimit)
 	if err != nil {
 		return nil, internalErr(err)
 	}
